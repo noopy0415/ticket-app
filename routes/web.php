@@ -14,6 +14,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         UserRole::Organizer => '/organizer/events',
         UserRole::Customer => '/orders',
     }))->name('dashboard');
+
+    Route::livewire('orders', 'pages::orders.index')->name('orders.index');
+    Route::livewire('orders/{order}/complete', 'pages::orders.complete')->name('orders.complete');
 });
 
 Route::middleware(['auth', 'verified', 'role:organizer'])->prefix('organizer')->name('organizer.')->group(function () {
