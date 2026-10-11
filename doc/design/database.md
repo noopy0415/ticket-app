@@ -85,7 +85,7 @@ erDiagram
 | description | text | NOT NULL | 説明 |
 | venue | string(100) | NOT NULL | 会場 |
 | starts_at | datetime | NOT NULL | 開始日時 |
-| ends_at | datetime | NULL 可 | 終了日時 |
+| ends_at | datetime | NOT NULL | 終了日時（starts_at より後） |
 | status | string(20) | NOT NULL、default `draft` | `draft`（下書き）/ `published`（公開）/ `unpublished`（管理者による非公開）。Enum `EventStatus` |
 | image_path | string | NULL 可 | 画像のパス（拡張 E14） |
 
