@@ -43,7 +43,7 @@ erDiagram
         bigint id PK
         bigint user_id FK
         bigint event_id FK
-        string status "pending / paid"
+        string status "pending / paid / cancelled / refunded"
         int total_amount
         string stripe_checkout_session_id UK
         datetime paid_at
@@ -108,7 +108,7 @@ erDiagram
 |-|-|-|-|
 | user_id | foreignId → users.id | NOT NULL、restrict | 注文者 |
 | event_id | foreignId → events.id | NOT NULL、restrict | 対象イベント（1注文 = 1イベント） |
-| status | string(20) | NOT NULL、default `pending` | `pending`（支払い待ち）/ `paid`（支払い済み）。Enum `OrderStatus` |
+| status | string(20) | NOT NULL、default `pending` | `pending`（支払い待ち）/ `paid`（支払い済み）/ `cancelled`（キャンセル）/ `refunded`（返金済み）。Enum `OrderStatus` |
 | total_amount | unsignedInteger | NOT NULL | 合計金額（円） |
 | stripe_checkout_session_id | string | NULL 可、unique | Checkout Session の ID。作成前と 0 円の注文は NULL |
 | paid_at | datetime | NULL 可 | 支払い確定日時 |
