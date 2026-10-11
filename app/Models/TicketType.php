@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use App\Enums\OrderStatus;
 use Database\Factories\TicketTypeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +29,11 @@ class TicketType extends Model
 {
     /** @use HasFactory<TicketTypeFactory> */
     use HasFactory;
+
+    /**
+     * Minutes a pending order keeps its tickets reserved.
+     */
+    public const PENDING_MINUTES = 15;
 
     /**
      * Get the attributes that should be cast.
@@ -60,6 +68,39 @@ class TicketType extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * Scope a query to include the reserved quantity as `reserved_quantity`.
+     *
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function withReservedQuantity(Builder $query): void
+    {
+        $query->withSum(['orderItems as reserved_quantity' => function (Builder $query) {
+            $query->whereHas('order', function (Builder $query) {
+                $query->where('status', OrderStatus::Paid)
+                    ->orWhere(function (Builder $query) {
+                        $query->where('status', OrderStatus::Pending)
+                            ->where('created_at', '>=', now()->subMinutes(self::PENDING_MINUTES));
+                    });
+            });
+        }], 'quantity');
+    }
+
+    /**
+     * Get the number of tickets still available.
+     *
+     * Uses `reserved_quantity` when loaded by withReservedQuantity() to avoid N+1 queries.
+     */
+    public function remaining(): int
+    {
+        $reserved = array_key_exists('reserved_quantity', $this->attributes)
+            ? (int) $this->attributes['reserved_quantity']
+            : (int) self::query()->whereKey($this->id)->withReservedQuantity()->value('reserved_quantity');
+
+        return max(0, $this->capacity - $reserved);
     }
 
     /**
