@@ -2,6 +2,7 @@
 
 use App\Enums\EventStatus;
 use App\Models\Event;
+use App\Models\TicketType;
 use App\Models\User;
 use Livewire\Livewire;
 
@@ -125,7 +126,7 @@ test('organizers can update their own event', function () {
 });
 
 test('organizers can toggle the event between draft and published', function () {
-    $event = Event::factory()->create();
+    $event = Event::factory()->has(TicketType::factory())->create();
 
     $this->actingAs($event->organizer);
 
