@@ -6,6 +6,7 @@
     ":inviter invited you to join this team.": ":inviter さんがあなたをこのチームに招待しました。",
     ":inviterName has invited you to join the :teamName team.": ":inviterName さんがあなたを :teamName チームに招待しました。",
     "A decryption key is required.": "復号キーは必須です。",
+    "Account type": "アカウントの種類",
     "A new verification link has been sent to the email address you provided during registration.": "登録時に入力したメールアドレスに、新しい認証リンクを送信しました。",
     "A new verification link has been sent to your email address.": "メールアドレスに新しい認証リンクを送信しました。",
     "A Timeout Occurred": "タイムアウト発生",
