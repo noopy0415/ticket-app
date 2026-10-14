@@ -40,7 +40,7 @@
 - 主催者は `events.organizer_id`、注文者は `orders.user_id`。どちらも `users.id` を参照する
 - ロール・状態は DB の enum 型にせず、string ＋ PHP Enum（`UserRole`、`EventStatus`、`OrderStatus`）でキャストする
 - 金額は円の整数（unsignedInteger）。明細の金額は `ticket_types.price` ではなく `order_items.unit_price` を使う
-- 残り枚数はカラムに持たない。`capacity` −（`paid` の数量 ＋ 15分以内の `pending` の数量）で毎回計算する。集計は `withSum()` などで N+1 にしない
+- 残り枚数はカラムに持たない。`capacity` −（`paid` の数量 ＋ 30分以内の `pending` の数量）で毎回計算する。集計は `withSum()` などで N+1 にしない
 - 売上につながる外部キー（主催者、注文者、注文のイベント、明細の券種）は restrict にする。親の一部であるもの（券種、明細、チケット）は cascade にする
 - `paid` への更新は「`pending` のときだけ更新する」条件付き更新にする（Webhook と完了ページの二重処理を防ぐ）
 
