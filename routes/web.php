@@ -1,11 +1,28 @@
 <?php
 
+use App\Enums\UserRole;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'welcome')->name('home');
+Route::livewire('/', 'pages::events.index')->name('events.index');
+Route::livewire('events/{event}', 'pages::events.show')->name('events.show');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
+    Route::get('dashboard', fn (Request $request): RedirectResponse => redirect(match ($request->user()->role) {
+        UserRole::Admin => '/admin/events',
+        UserRole::Organizer => '/organizer/events',
+        UserRole::Customer => '/orders',
+    }))->name('dashboard');
+
+    Route::livewire('orders', 'pages::orders.index')->name('orders.index');
+    Route::livewire('orders/{order}/complete', 'pages::orders.complete')->name('orders.complete');
+});
+
+Route::middleware(['auth', 'verified', 'role:organizer'])->prefix('organizer')->name('organizer.')->group(function () {
+    Route::livewire('events', 'pages::organizer.events.index')->name('events.index');
+    Route::livewire('events/create', 'pages::organizer.events.create')->name('events.create');
+    Route::livewire('events/{event}/edit', 'pages::organizer.events.edit')->name('events.edit');
 });
 
 require __DIR__.'/settings.php';
