@@ -34,6 +34,22 @@ new #[Title('注文完了')] class extends Component {
     }
 
     /**
+     * Check the payment again while the order is pending.
+     *
+     * Called by wire:poll, so the page turns complete when the webhook or Stripe confirms the payment.
+     */
+    public function checkPayment(CheckoutService $checkoutService, OrderService $orderService): void
+    {
+        $this->authorize('viewComplete', $this->order);
+
+        $this->order->refresh();
+
+        if ($this->order->status === OrderStatus::Pending && $this->order->stripe_checkout_session_id !== null) {
+            $this->confirmPayment($this->order, $this->order->stripe_checkout_session_id, $checkoutService, $orderService);
+        }
+    }
+
+    /**
      * Mark the order as paid when Stripe says its Checkout Session has been paid.
      */
     protected function confirmPayment(Order $order, string $sessionId, CheckoutService $checkoutService, OrderService $orderService): void
@@ -47,7 +63,7 @@ new #[Title('注文完了')] class extends Component {
         }
 
         if ($session->payment_status === 'paid' && (string) ($session->metadata->order_id ?? '') === (string) $order->id) {
-            $orderService->markAsPaid($order);
+            $orderService->markAsPaid($order, is_string($session->payment_intent) ? $session->payment_intent : null);
         }
     }
 }; ?>
@@ -57,9 +73,11 @@ new #[Title('注文完了')] class extends Component {
         {{ $order->isPaid() ? '購入が完了しました' : '支払いを確認しています' }}
     </flux:heading>
 
-    @unless ($order->isPaid())
-        <flux:text>支払いの確認には少し時間がかかることがあります。しばらくしてから注文一覧でご確認ください。</flux:text>
-    @endunless
+    @if ($order->status === \App\Enums\OrderStatus::Pending)
+        <div wire:poll.3s="checkPayment">
+            <flux:text>支払いの確認には少し時間がかかることがあります。このページは数秒ごとに自動で更新されます。</flux:text>
+        </div>
+    @endif
 
     <dl class="grid gap-2 text-sm sm:grid-cols-[6rem_1fr]">
         <dt class="text-zinc-500 dark:text-zinc-400">イベント</dt>

@@ -71,6 +71,18 @@ class CheckoutService
     }
 
     /**
+     * Expire a Checkout Session so it can no longer be paid.
+     *
+     * Fails when the session has already been completed or expired.
+     *
+     * @throws ApiErrorException
+     */
+    public function expireSession(string $id): Session
+    {
+        return $this->stripe->checkout->sessions->expire($id);
+    }
+
+    /**
      * Build a webhook event from the request body after verifying its signature.
      *
      * @throws SignatureVerificationException

@@ -8,6 +8,7 @@ use App\Models\Event;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OrderService
@@ -114,15 +115,22 @@ class OrderService
      * Mark the order as paid and issue one ticket per seat.
      *
      * Only pending orders are updated, so the webhook and the complete page never issue tickets twice.
+     * A payment for an order that is no longer pending (e.g. cancelled) is logged, since the money
+     * has been received without tickets and needs to be refunded by hand.
      *
+     * @param  string|null  $paymentIntentId  The Stripe PaymentIntent that paid the order. Null for free orders.
      * @return bool Whether the order was marked as paid by this call.
      */
-    public function markAsPaid(Order $order): bool
+    public function markAsPaid(Order $order, ?string $paymentIntentId = null): bool
     {
-        $paid = DB::transaction(function () use ($order): bool {
+        $paid = DB::transaction(function () use ($order, $paymentIntentId): bool {
             $updated = Order::whereKey($order->id)
                 ->where('status', OrderStatus::Pending)
-                ->update(['status' => OrderStatus::Paid, 'paid_at' => now()]) > 0;
+                ->update([
+                    'status' => OrderStatus::Paid,
+                    'paid_at' => now(),
+                    'stripe_payment_intent_id' => $paymentIntentId,
+                ]) > 0;
 
             if (! $updated) {
                 return false;
@@ -130,7 +138,7 @@ class OrderService
 
             foreach ($order->items()->get() as $item) {
                 $item->tickets()->createMany(
-                    array_map(fn (): array => ['code' => (string) Str::ulid()], range(1, $item->quantity)),
+                    array_map(fn (): array => ['code' => (string) Str::uuid()], range(1, $item->quantity)),
                 );
             }
 
@@ -138,6 +146,15 @@ class OrderService
         });
 
         $order->refresh();
+
+        if (! $paid && ! $order->isPaid()) {
+            Log::critical('支払いを受け取りましたが、注文が支払い待ちではないためチケットを発行していません。', [
+                'order_id' => $order->id,
+                'status' => $order->status->value,
+                'stripe_checkout_session_id' => $order->stripe_checkout_session_id,
+                'stripe_payment_intent_id' => $paymentIntentId,
+            ]);
+        }
 
         return $paid;
     }

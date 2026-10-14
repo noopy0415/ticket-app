@@ -5,6 +5,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Ticket;
 use App\Services\CheckoutService;
+use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Stripe\Exception\SignatureVerificationException;
 
@@ -18,10 +19,10 @@ beforeEach(function () {
  *
  * @param  array<string, mixed>  $event
  */
-function postStripeWebhook(array $event, ?string $secret = null): TestResponse
+function postStripeWebhook(array $event, ?string $secret = null, ?int $timestamp = null): TestResponse
 {
     $payload = json_encode($event);
-    $timestamp = time();
+    $timestamp ??= time();
     $signature = hash_hmac('sha256', "{$timestamp}.{$payload}", $secret ?? config('services.stripe.webhook_secret'));
 
     return test()->call('POST', route('stripe.webhook'), server: [
@@ -46,6 +47,7 @@ function checkoutSessionCompletedEvent(Order $order, string $paymentStatus = 'pa
                 'id' => 'cs_test_dummy',
                 'object' => 'checkout.session',
                 'payment_status' => $paymentStatus,
+                'payment_intent' => 'pi_test_dummy',
                 'metadata' => ['order_id' => (string) $order->id],
             ],
         ],
@@ -56,6 +58,7 @@ test('a completed checkout marks the order as paid and issues tickets', function
     postStripeWebhook(checkoutSessionCompletedEvent($this->order))->assertOk();
 
     expect($this->order->refresh()->status)->toBe(OrderStatus::Paid)
+        ->and($this->order->stripe_payment_intent_id)->toBe('pi_test_dummy')
         ->and($this->order->tickets()->count())->toBe(2);
 });
 
@@ -154,4 +157,33 @@ test('a signature failure reported by the service is answered with 400', functio
     $this->call('POST', route('stripe.webhook'), content: '{}')->assertStatus(400);
 
     expect($this->order->refresh()->status)->toBe(OrderStatus::Pending);
+});
+
+test('a webhook signed with an old timestamp is rejected', function () {
+    postStripeWebhook(checkoutSessionCompletedEvent($this->order), timestamp: time() - 301)->assertStatus(400);
+
+    expect($this->order->refresh()->status)->toBe(OrderStatus::Pending)
+        ->and($this->order->tickets()->count())->toBe(0);
+});
+
+test('issued tickets have unique UUID codes', function () {
+    postStripeWebhook(checkoutSessionCompletedEvent($this->order))->assertOk();
+
+    $codes = $this->order->tickets()->pluck('code');
+
+    expect($codes)->toHaveCount(2)
+        ->and($codes->unique())->toHaveCount(2)
+        ->and($codes->every(fn (string $code) => Str::isUuid($code)))->toBeTrue();
+});
+
+test('the complete page after the webhook does not issue tickets again or ask Stripe', function () {
+    postStripeWebhook(checkoutSessionCompletedEvent($this->order))->assertOk();
+    $this->mock(CheckoutService::class)->shouldReceive('retrieveSession')->never();
+
+    $this->actingAs($this->order->user)
+        ->get(route('orders.complete', $this->order).'?session_id=cs_test_dummy')
+        ->assertOk()
+        ->assertSee('購入が完了しました');
+
+    expect($this->order->tickets()->count())->toBe(2);
 });

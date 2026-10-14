@@ -50,7 +50,7 @@ class StripeWebhookController extends Controller
             ->first();
 
         if ($order !== null) {
-            $orderService->markAsPaid($order);
+            $orderService->markAsPaid($order, is_string($session->payment_intent) ? $session->payment_intent : null);
         }
     }
 }

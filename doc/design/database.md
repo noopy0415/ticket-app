@@ -46,6 +46,7 @@ erDiagram
         string status "pending / paid / cancelled / refunded"
         int total_amount
         string stripe_checkout_session_id UK
+        string stripe_payment_intent_id UK
         datetime paid_at
     }
     order_items {
@@ -111,6 +112,7 @@ erDiagram
 | status | string(20) | NOT NULL、default `pending` | `pending`（支払い待ち）/ `paid`（支払い済み）/ `cancelled`（キャンセル）/ `refunded`（返金済み）。Enum `OrderStatus` |
 | total_amount | unsignedInteger | NOT NULL | 合計金額（円） |
 | stripe_checkout_session_id | string | NULL 可、unique | Checkout Session の ID。作成前と 0 円の注文は NULL |
+| stripe_payment_intent_id | string | NULL 可、unique | 支払った PaymentIntent の ID。`paid` にしたときに保存する。0 円の注文は NULL |
 | paid_at | datetime | NULL 可 | 支払い確定日時 |
 
 - index: `(event_id, status)`（主催者の売上集計のため）
@@ -131,7 +133,7 @@ erDiagram
 | カラム | 型 | 制約 | 説明 |
 |-|-|-|-|
 | order_item_id | foreignId → order_items.id | NOT NULL、cascade | 明細 |
-| code | string(26) | NOT NULL、unique | チケット固有のコード（ULID など推測しにくい値） |
+| code | string(36) | NOT NULL、unique | チケット固有のコード（UUID） |
 
 <br>
 

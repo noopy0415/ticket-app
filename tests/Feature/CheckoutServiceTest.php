@@ -80,3 +80,14 @@ test('a Stripe API error is turned into a purchase error', function () {
 
     expect($order->refresh()->stripe_checkout_session_id)->toBeNull();
 });
+
+test('a checkout session is expired by its ID', function () {
+    $requests = [];
+    fakeStripeHttpClient($requests);
+
+    app(CheckoutService::class)->expireSession('cs_test_dummy');
+
+    expect($requests)->toHaveCount(1)
+        ->and($requests[0]['method'])->toBe('post')
+        ->and($requests[0]['url'])->toEndWith('/v1/checkout/sessions/cs_test_dummy/expire');
+});

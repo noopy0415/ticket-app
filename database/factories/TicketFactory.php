@@ -21,7 +21,7 @@ class TicketFactory extends Factory
     {
         return [
             'order_item_id' => OrderItem::factory(),
-            'code' => (string) Str::ulid(),
+            'code' => (string) Str::uuid(),
         ];
     }
 }
