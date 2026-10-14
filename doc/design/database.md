@@ -161,11 +161,11 @@ erDiagram
 
 確保済みの枚数 = 次の注文に含まれる order_items.quantity の合計
   - status が paid の注文
-  - status が pending で、created_at が 15 分以内の注文
+  - status が pending で、created_at が 30 分以内の注文
 ```
 
-- 15 分を過ぎた `pending` の注文は、支払いを中断したものとみなし、枠を自動で空ける（定期処理は不要）
-- 15 分は Stripe Checkout Session の有効期限を考慮して決める値。定数か config に置く
+- 30 分を過ぎた `pending` の注文は、支払いを中断したものとみなし、枠を自動で空ける（定期処理は不要）
+- 30 分は Stripe Checkout Session の有効期限（最短 30 分）に合わせた値。`OrderService::PENDING_MINUTES` に置く
 - 一覧や詳細では `withSum()` などで券種ごとに集計し、N+1 にしない
 
 ### カラムで持たない理由

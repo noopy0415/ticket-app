@@ -2,18 +2,20 @@
 
 namespace App\Services;
 
+use App\Enums\OrderStatus;
 use App\Exceptions\PurchaseException;
 use App\Models\Event;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class OrderService
 {
     /**
      * Minutes a pending order keeps its tickets reserved.
      */
-    public const PENDING_MINUTES = 15;
+    public const PENDING_MINUTES = 30;
 
     /**
      * Maximum number of tickets per ticket type in one order.
@@ -88,5 +90,55 @@ class OrderService
 
             return $order;
         });
+    }
+
+    /**
+     * Cancel the order and release its reserved tickets.
+     *
+     * Only pending orders are cancelled, so a paid order is never changed even if this runs late.
+     *
+     * @return bool Whether the order was cancelled by this call.
+     */
+    public function cancelOrder(Order $order): bool
+    {
+        $cancelled = Order::whereKey($order->id)
+            ->where('status', OrderStatus::Pending)
+            ->update(['status' => OrderStatus::Cancelled]) > 0;
+
+        $order->refresh();
+
+        return $cancelled;
+    }
+
+    /**
+     * Mark the order as paid and issue one ticket per seat.
+     *
+     * Only pending orders are updated, so the webhook and the complete page never issue tickets twice.
+     *
+     * @return bool Whether the order was marked as paid by this call.
+     */
+    public function markAsPaid(Order $order): bool
+    {
+        $paid = DB::transaction(function () use ($order): bool {
+            $updated = Order::whereKey($order->id)
+                ->where('status', OrderStatus::Pending)
+                ->update(['status' => OrderStatus::Paid, 'paid_at' => now()]) > 0;
+
+            if (! $updated) {
+                return false;
+            }
+
+            foreach ($order->items()->get() as $item) {
+                $item->tickets()->createMany(
+                    array_map(fn (): array => ['code' => (string) Str::ulid()], range(1, $item->quantity)),
+                );
+            }
+
+            return true;
+        });
+
+        $order->refresh();
+
+        return $paid;
     }
 }

@@ -1,12 +1,15 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Http\Controllers\StripeWebhookController;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::livewire('/', 'pages::events.index')->name('events.index');
 Route::livewire('events/{event}', 'pages::events.show')->name('events.show');
+
+Route::post('stripe/webhook', StripeWebhookController::class)->name('stripe.webhook');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', fn (Request $request): RedirectResponse => redirect(match ($request->user()->role) {
@@ -17,6 +20,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::livewire('orders', 'pages::orders.index')->name('orders.index');
     Route::livewire('orders/{order}/complete', 'pages::orders.complete')->name('orders.complete');
+    Route::livewire('orders/{order}/cancel', 'pages::orders.cancel')->name('orders.cancel');
 });
 
 Route::middleware(['auth', 'verified', 'role:organizer'])->prefix('organizer')->name('organizer.')->group(function () {

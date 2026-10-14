@@ -3,6 +3,7 @@
 use App\Exceptions\PurchaseException;
 use App\Models\Event;
 use App\Models\TicketType;
+use App\Services\CheckoutService;
 use App\Services\OrderService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -46,12 +47,13 @@ new #[Title('イベント詳細')] class extends Component {
     }
 
     /**
-     * Place a pending order for the selected tickets.
+     * Place a pending order for the selected tickets and go to the Stripe payment page.
      *
      * Guests are sent to login and brought back to this page afterwards.
      * Quantities are checked by OrderService, since this property can be changed by the client.
+     * Free orders skip Stripe, are paid at once and go straight to the complete page.
      */
-    public function pay(OrderService $orderService): void
+    public function pay(OrderService $orderService, CheckoutService $checkoutService): void
     {
         if (! Auth::check()) {
             session()->put('url.intended', route('events.show', $this->event));
@@ -69,7 +71,23 @@ new #[Title('イベント詳細')] class extends Component {
             return;
         }
 
-        $this->redirectRoute('orders.complete', $order);
+        if ($order->total_amount === 0) {
+            $orderService->markAsPaid($order);
+            $this->redirectRoute('orders.complete', $order);
+
+            return;
+        }
+
+        try {
+            $checkoutUrl = $checkoutService->createSession($order);
+        } catch (PurchaseException $exception) {
+            $orderService->cancelOrder($order);
+            $this->addError('purchase', $exception->getMessage());
+
+            return;
+        }
+
+        $this->redirect($checkoutUrl);
     }
 }; ?>
 

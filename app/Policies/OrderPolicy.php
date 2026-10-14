@@ -28,4 +28,14 @@ class OrderPolicy
     {
         return $order->user_id === $user->id;
     }
+
+    /**
+     * Determine whether the user can cancel the order.
+     *
+     * Only the buyer, who comes back here from the Stripe payment page.
+     */
+    public function cancel(User $user, Order $order): bool
+    {
+        return $order->user_id === $user->id;
+    }
 }

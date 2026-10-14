@@ -70,3 +70,40 @@ test('quantities outside the allowed range are rejected', function (mixed $quant
     'more than the maximum' => OrderService::MAX_QUANTITY + 1,
     'negative' => -1,
 ]);
+
+test('marking an order as paid issues one ticket per seat', function () {
+    $order = Order::factory()->for($this->event)->create();
+    OrderItem::factory()->for($order)->create(['quantity' => 2]);
+    OrderItem::factory()->for($order)->create(['quantity' => 1]);
+
+    $paid = app(OrderService::class)->markAsPaid($order);
+
+    expect($paid)->toBeTrue()
+        ->and($order->status)->toBe(OrderStatus::Paid)
+        ->and($order->paid_at)->not->toBeNull()
+        ->and($order->items()->withCount('tickets')->pluck('tickets_count')->sort()->values()->all())->toBe([1, 2])
+        ->and($order->tickets()->pluck('code')->unique())->toHaveCount(3);
+});
+
+test('an order already paid does not get its tickets issued twice', function () {
+    $order = Order::factory()->for($this->event)->create();
+    OrderItem::factory()->for($order)->create(['quantity' => 2]);
+    app(OrderService::class)->markAsPaid($order);
+
+    $paid = app(OrderService::class)->markAsPaid($order);
+
+    expect($paid)->toBeFalse()
+        ->and($order->tickets()->count())->toBe(2);
+});
+
+test('a cancelled order is not marked as paid', function () {
+    $order = Order::factory()->for($this->event)->create();
+    OrderItem::factory()->for($order)->create();
+    app(OrderService::class)->cancelOrder($order);
+
+    $paid = app(OrderService::class)->markAsPaid($order);
+
+    expect($paid)->toBeFalse()
+        ->and($order->status)->toBe(OrderStatus::Cancelled)
+        ->and($order->tickets()->count())->toBe(0);
+});
